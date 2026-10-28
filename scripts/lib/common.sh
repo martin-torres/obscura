@@ -431,6 +431,37 @@ obscura_remove_path_marker() {
   done
 }
 
+# 10 days. Cron fires daily and allows an hour of slack so a run that
+# lands a few seconds short of 864000s is not pushed out another day.
+OBSCURA_UPDATE_INTERVAL_SEC=864000
+OBSCURA_UPDATE_INTERVAL_SLACK_SEC=3600
+
+obscura_record_successful_check() {
+  mkdir -p "$OBSCURA_STATE_DIR"
+  date +%s > "${OBSCURA_STATE_DIR}/last-successful-check"
+}
+
+# Scheduled runs (cron) wait 10 days after the last successful check.
+# A manual scripts/update.sh leaves OBSCURA_UPDATE_SCHEDULED unset and always runs.
+obscura_scheduled_check_due() {
+  [[ "${OBSCURA_UPDATE_SCHEDULED:-0}" == "1" ]] || return 0
+  local stamp now elapsed due
+  stamp=$(cat "${OBSCURA_STATE_DIR}/last-successful-check" 2>/dev/null || true)
+  case "$stamp" in
+    ''|*[!0-9]*) return 0 ;;
+  esac
+  now=$(date +%s)
+  elapsed=$((now - stamp))
+  if [[ "$elapsed" -lt 0 ]]; then
+    return 0
+  fi
+  due=$((OBSCURA_UPDATE_INTERVAL_SEC - OBSCURA_UPDATE_INTERVAL_SLACK_SEC))
+  if [[ "$elapsed" -lt "$due" ]]; then
+    return 1
+  fi
+  return 0
+}
+
 obscura_remove_cron() {
   command -v crontab >/dev/null 2>&1 || return 0
   local current tmp
@@ -458,10 +489,10 @@ obscura_install_cron() {
   printf '%s\n' "$current" > "$tmp"
   cat >> "$tmp" <<EOF
 # OBSCURA_UPDATE_BEGIN
-*/10 * * * * ${OBSCURA_SRC}/scripts/update.sh
+17 4 * * * OBSCURA_UPDATE_SCHEDULED=1 ${OBSCURA_SRC}/scripts/update.sh
 # OBSCURA_UPDATE_END
 EOF
   crontab "$tmp"
   rm -f "$tmp"
-  obscura_log "scheduled scripts/update.sh with cron, every 10 minutes"
+  obscura_log "scheduled scripts/update.sh daily at 04:17. It checks origin only when the last successful check is at least 10 days old."
 }

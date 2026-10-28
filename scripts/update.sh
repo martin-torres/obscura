@@ -25,6 +25,11 @@ exec > >(tee -a "${OBSCURA_LOG_DIR}/update.log") 2>&1
 
 obscura_log "update start src=${OBSCURA_SRC} branch=${OBSCURA_BRANCH}"
 
+if ! obscura_scheduled_check_due; then
+  obscura_log "scheduled check skipped. The last successful check is less than 10 days old. Run scripts/update.sh to update now."
+  exit 0
+fi
+
 if obscura_worktree_dirty; then
   obscura_warn "refusing to pull, rebuild, or restart: ${OBSCURA_SRC} has uncommitted changes"
   git -C "$OBSCURA_SRC" status --porcelain --untracked-files=normal >&2 || true
@@ -53,18 +58,21 @@ if [[ "$head_sha" != "$origin_sha" ]]; then
   else
     obscura_warn "local history and origin/${OBSCURA_BRANCH} have diverged. Not merging and not rebuilding."
     obscura_warn "reconcile ${OBSCURA_SRC} yourself (merge or rebase), then push to origin. Nothing was reset."
+    obscura_record_successful_check
     obscura_log "update skipped"
     exit 0
   fi
 fi
 
 if obscura_stamp_matches; then
+  obscura_record_successful_check
   obscura_log "OK already at $(git -C "$OBSCURA_SRC" rev-parse --short HEAD) (${OBSCURA_FEATURES}). Service left as-is."
   exit 0
 fi
 
 if [[ "${OBSCURA_UPDATE_SKIP_BUILD:-0}" == "1" ]]; then
   obscura_write_stamp
+  obscura_record_successful_check
   obscura_log "OK skip build requested. Stamp updated to $(git -C "$OBSCURA_SRC" rev-parse --short HEAD)."
   exit 0
 fi
@@ -78,6 +86,7 @@ if [[ "${OBSCURA_USE_PREBUILT:-0}" == "1" ]]; then
   else
     obscura_warn "no matching GitHub release asset for $(git -C "$OBSCURA_SRC" rev-parse --short HEAD). Keeping the installed binary."
     obscura_warn "Unset OBSCURA_USE_PREBUILT in ${OBSCURA_CONFIG_FILE} to compile from source."
+    obscura_record_successful_check
     obscura_log "update skipped"
     exit 0
   fi
@@ -98,4 +107,5 @@ fi
 if ! obscura_wait_cdp; then
   obscura_die "CDP did not answer on ${OBSCURA_HOST}:${OBSCURA_PORT} after restart. See ${OBSCURA_LOG_DIR}/serve.log"
 fi
+obscura_record_successful_check
 obscura_log "OK updated to $(git -C "$OBSCURA_SRC" rev-parse --short HEAD) and CDP is up on port ${OBSCURA_PORT}"

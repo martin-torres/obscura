@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Offline checks for the auto-updater: dirty trees, fast-forward, and divergence.
+# Offline checks for the auto-updater: dirty trees, fast-forward, divergence,
+# and the 10-day cron gate. A manual run ignores that gate.
 if [ -z "${BASH_VERSION:-}" ]; then
   echo "This script requires bash." >&2
   exit 1
@@ -82,6 +83,29 @@ grep -q "v2" "$TMP/checkout/README"
 head_sha=$(git -C "$TMP/checkout" rev-parse HEAD)
 stamp=$(cat "$TMP/state/installed.commit")
 [[ "$head_sha" == "$stamp" ]]
+[[ -n "$(cat "$TMP/state/last-successful-check")" ]]
+
+echo "v3" >> "$TMP/origin/README"
+git -C "$TMP/origin" add README
+git -C "$TMP/origin" commit -m v3 >/dev/null
+OBSCURA_UPDATE_SCHEDULED=1 OBSCURA_UPDATE_SKIP_BUILD=1 run_update
+grep -q "scheduled check skipped" "$TMP/out"
+if grep -q "v3" "$TMP/checkout/README"; then
+  echo "scheduled run fast-forwarded before 10 days" >&2
+  exit 1
+fi
+
+OBSCURA_UPDATE_SKIP_BUILD=1 run_update
+grep -q "v3" "$TMP/checkout/README"
+
+echo "v4" >> "$TMP/origin/README"
+git -C "$TMP/origin" add README
+git -C "$TMP/origin" commit -m v4 >/dev/null
+now=$(date +%s)
+printf '%s\n' "$((now - 900000))" > "$TMP/state/last-successful-check"
+OBSCURA_UPDATE_SCHEDULED=1 OBSCURA_UPDATE_SKIP_BUILD=1 run_update
+grep -q "v4" "$TMP/checkout/README"
+grep -q "fast-forward" "$TMP/out"
 
 echo "local only" >> "$TMP/checkout/README"
 git -C "$TMP/checkout" add README

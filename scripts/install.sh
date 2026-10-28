@@ -305,12 +305,11 @@ ExecStart=${OBSCURA_SRC}/scripts/update.sh
 EOF
     obscura_priv tee "${unit_dir}/obscura-update.timer" >/dev/null <<EOF
 [Unit]
-Description=Update Obscura from origin/main every 10 minutes
+Description=Update Obscura from origin/main every 10 days
 
 [Timer]
-OnBootSec=2min
-OnUnitActiveSec=10min
-AccuracySec=1min
+OnUnitActiveSec=10d
+AccuracySec=1h
 Persistent=true
 Unit=obscura-update.service
 
@@ -349,12 +348,11 @@ ExecStart=${OBSCURA_SRC}/scripts/update.sh
 EOF
     cat > "${unit_dir}/obscura-update.timer" <<EOF
 [Unit]
-Description=Update Obscura from origin/main every 10 minutes
+Description=Update Obscura from origin/main every 10 days
 
 [Timer]
-OnBootSec=2min
-OnUnitActiveSec=10min
-AccuracySec=1min
+OnUnitActiveSec=10d
+AccuracySec=1h
 Persistent=true
 Unit=obscura-update.service
 
@@ -458,7 +456,8 @@ enable_launchd() {
     serve_plist="${agent_dir}/sh.obscura.serve.plist"
     update_plist="${agent_dir}/sh.obscura.update.plist"
     write_plist "sh.obscura.serve" "$serve_plist" "${OBSCURA_SRC}/scripts/serve.sh"
-    write_plist "sh.obscura.update" "$update_plist" "${OBSCURA_SRC}/scripts/update.sh" "600"
+    # 864000 seconds is 10 days.
+    write_plist "sh.obscura.update" "$update_plist" "${OBSCURA_SRC}/scripts/update.sh" "864000"
     obscura_priv launchctl bootout "${domain}/sh.obscura.serve" >/dev/null 2>&1 || true
     obscura_priv launchctl bootout "${domain}/sh.obscura.update" >/dev/null 2>&1 || true
     obscura_priv launchctl bootstrap "$domain" "$serve_plist"
@@ -473,7 +472,8 @@ enable_launchd() {
     serve_plist="${agent_dir}/sh.obscura.serve.plist"
     update_plist="${agent_dir}/sh.obscura.update.plist"
     write_plist "sh.obscura.serve" "$serve_plist" "${OBSCURA_SRC}/scripts/serve.sh"
-    write_plist "sh.obscura.update" "$update_plist" "${OBSCURA_SRC}/scripts/update.sh" "600"
+    # 864000 seconds is 10 days.
+    write_plist "sh.obscura.update" "$update_plist" "${OBSCURA_SRC}/scripts/update.sh" "864000"
     launchctl bootout "${domain}/sh.obscura.serve" >/dev/null 2>&1 || true
     launchctl bootout "${domain}/sh.obscura.update" >/dev/null 2>&1 || true
     launchctl bootstrap "$domain" "$serve_plist"
@@ -490,7 +490,7 @@ start_service() {
     Linux)
       write_systemd_units
       if enable_systemd; then
-        obscura_log "started systemd ${OBSCURA_SERVICE_MODE} service and 10 minute update timer"
+        obscura_log "started systemd ${OBSCURA_SERVICE_MODE} service and 10 day update timer"
         return 0
       fi
       obscura_warn "systemd is not running. Starting Obscura in the background and scheduling updates with cron."
@@ -500,7 +500,7 @@ start_service() {
       ;;
     Darwin)
       if enable_launchd; then
-        obscura_log "started launchd agent and 10 minute update job"
+        obscura_log "started launchd agent and 10 day update job"
         return 0
       fi
       obscura_die "launchctl failed. Obscura was built but the agent is not loaded."

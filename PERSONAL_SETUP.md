@@ -39,7 +39,7 @@ From a checkout you already have:
 
 Root runs a system install. Anyone else gets a user install. `OBSCURA_SERVICE=user` or `OBSCURA_SERVICE=system` overrides that.
 
-On Linux, a user install asks systemd to linger the account so the service stays up after logout. On a machine whose PID 1 is not systemd (some containers), the installer still writes the unit files, starts the process in the background, and schedules `scripts/update.sh` with cron every 10 minutes.
+On Linux, a user install asks systemd to linger the account so the service stays up after logout. On a machine whose PID 1 is not systemd (some containers), the installer still writes the unit files, starts the process in the background, and schedules a daily cron job. That job checks for updates only after 10 days have passed since the last successful check.
 
 Check it:
 
@@ -122,11 +122,11 @@ Cookies and localStorage persist in the storage directory (`~/.local/state/obscu
 
 ## How updates propagate
 
-`scripts/update.sh` runs every 10 minutes.
+`scripts/update.sh` runs every 10 days.
 
-- Linux with systemd: `obscura-update.timer` (`OnUnitActiveSec=10min`).
-- macOS: launchd `sh.obscura.update` with `StartInterval` 600.
-- Linux without systemd: a crontab line, `*/10 * * * *`.
+- Linux with systemd: `obscura-update.timer` (`OnUnitActiveSec=10d`).
+- macOS: launchd `sh.obscura.update` with `StartInterval` 864000 (10 days).
+- Linux without systemd: cron runs daily at 04:17 (`17 4 * * *`) and exits immediately unless the last successful check was at least 10 days ago. An hour of slack keeps the tenth daily run from missing the window by a few seconds.
 
 The installed checkout should stay on `main`. The updater fast-forwards that branch. It does not switch branches, and it does not rebase a feature branch onto `main`.
 
@@ -138,7 +138,7 @@ Each run:
 4. If the installed commit and feature set already match, it leaves the service alone.
 5. Otherwise it rebuilds (or downloads a matching release), restarts the service, and checks that port 9222 answers.
 
-Push a commit to `origin/main` from one machine. The other two pick it up on their next run, as long as their checkouts are clean.
+Push a commit to `origin/main` from one machine. The other two pick it up on their next check, as long as their checkouts are clean. That can take up to 10 days.
 
 Logs:
 
@@ -156,7 +156,17 @@ sudo journalctl -u obscura -u obscura-update -f
 
 The timer's git remote has to work with no prompt. Use an SSH key or a credential helper on each machine.
 
-Run an update by hand with `scripts/update.sh` in the checkout.
+For an immediate update, run the script yourself. A manual run does not wait for the 10-day schedule:
+
+```bash
+# from the installed checkout
+./scripts/update.sh
+
+# or, when install.sh cloned the tree for you
+~/.local/share/obscura/src/scripts/update.sh
+```
+
+On a system install the checkout is `/usr/local/src/obscura`. `OBSCURA_FORCE_REBUILD=1` in front of the same command rebuilds even when that commit is already installed.
 
 ## Sync with upstream
 
