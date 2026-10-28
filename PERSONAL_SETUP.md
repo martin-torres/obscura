@@ -128,9 +128,11 @@ Cookies and localStorage persist in the storage directory (`~/.local/state/obscu
 - macOS: launchd `sh.obscura.update` with `StartInterval` 600.
 - Linux without systemd: a crontab line, `*/10 * * * *`.
 
+The installed checkout should stay on `main`. The updater fast-forwards that branch. It does not switch branches, and it does not rebase a feature branch onto `main`.
+
 Each run:
 
-1. If tracked files in the checkout have uncommitted changes, it logs a warning and stops. It does not stash, reset, or rebuild.
+1. If the checkout has uncommitted changes, it logs a warning and stops. It does not stash, reset, or rebuild. Untracked files count. Ignored build output such as `target/` does not.
 2. It fetches `origin/main`.
 3. If `origin/main` is strictly ahead, it fast-forwards. If you have local commits and the histories have diverged, it logs a warning and does not merge.
 4. If the installed commit and feature set already match, it leaves the service alone.
