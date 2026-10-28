@@ -105,6 +105,16 @@ Want to sponsor? Email [hello@obscura.sh](mailto:hello@obscura.sh).
     </td>
 </table>
 
+## Personal fork
+
+This fork's `main` branch is the copy to install and keep updated on your own machines. [PERSONAL_SETUP.md](PERSONAL_SETUP.md) covers the one-command install, the always-on CDP service, automatic updates, and agent setup.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/martin-torres/obscura/main/scripts/install.sh | bash
+```
+
+The service listens on `http://127.0.0.1:9222`.
+
 ## Install
 
 ### Download
